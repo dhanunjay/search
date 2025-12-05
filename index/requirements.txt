@@ -1,0 +1,14 @@
+# requirements.txt
+# Core LangChain V1 Architecture components
+langchain-core
+langchain-community
+
+# Integrations
+langchain-google-genai
+langchain-elasticsearch
+
+# Server/API dependencies
+fastapi[standard]
+
+# other
+pypdf

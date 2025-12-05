@@ -1,0 +1,13 @@
+# langchain
+langchain-core
+langchain-community
+
+# Integrations
+langchain-google-genai
+langchain-elasticsearch
+
+# Server/API dependencies
+fastapi[standard]
+
+# other
+pypdf
