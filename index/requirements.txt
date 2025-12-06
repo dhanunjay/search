@@ -6,6 +6,7 @@ langchain-community
 # Integrations
 langchain-google-genai
 langchain-elasticsearch
+confluent-kafka
 
 # Server/API dependencies
 fastapi[standard]
