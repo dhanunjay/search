@@ -9,6 +9,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from core.model import IndexDocumentJob
+from wal.kafka import KafkaMessageData, KafkaReader
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class IndexingWorker:
             strategy=DenseVectorStrategy(hybrid=True),
         )
 
-    def index_document(self, req: IndexDocumentJob):
+    def index_document(self, req: IndexDocumentJob) -> None:
         """
         Indexes a document into Elasticsearch.
 
@@ -70,9 +71,20 @@ class IndexingWorker:
 
         file_path = req.source_properties["file_path"]
         if not os.path.exists(file_path):
-            raise FileNotFoundError(file_path)
+            # BUG: File might have been deleted after we accepted the request
+            log.error(
+                "File is deleted or inaccessible. Drop the request and mark job failed"
+            )
+            return
+            # raise FileNotFoundError(file_path)
         if not os.path.isfile(file_path):
-            raise IsADirectoryError(file_path)
+            # File was deleted and a folder with similar name was created
+            log.error(
+                "File was deleted and a folder with similar name was created. Drop the request and mark job failed"
+            )
+
+            return
+            # raise IsADirectoryError(file_path)
 
         loader = PyPDFLoader(str(file_path), extract_images=False, mode="single")
         docs = loader.load()
@@ -96,14 +108,14 @@ class IndexingWorker:
 
 class IndexingAgent:
 
-    def __init__(self, index_worker: Any, kafka_reader: Any):
+    def __init__(self, index_worker: IndexingWorker, kafka_reader: KafkaReader):
         self._index_worker = index_worker
         self._kafka_reader = kafka_reader
         self._running = True
         self.CONSUME_TIMEOUT = 1.0
         self.IDLE_SLEEP = 1
 
-    def __call__(self, batch: List[Any]) -> None:
+    def __call__(self, batch: List[KafkaMessageData]) -> None:
 
         log.debug(f"IndexingAgent: Processing batch of {len(batch)} jobs")
 
@@ -114,10 +126,11 @@ class IndexingAgent:
                 self._index_worker.index_document(msg.value)
 
             except Exception as e:
+                # BUG: if the indexing is failing repeatedly for a document we should store it in a dead topic for later examination (otherwise it is retried again and again)
                 log.error(f"IndexingAgent: ", exc_info=True)
                 raise
 
-    def start(self):
+    def start(self) -> None:
         with self._kafka_reader as reader:
             log.info("IndexingAgent: agent started listening for messages")
             while self._running:
@@ -138,6 +151,6 @@ class IndexingAgent:
 
             log.info(f"IndexingAgent: agent shutdown")
 
-    def stop(self):
+    def stop(self) -> None:
         self._running = False
         log.info(f"IndexingAgent: agent shutdown requested")
