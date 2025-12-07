@@ -25,8 +25,12 @@ class KafkaReader:
         self,
         conf: dict,
         topic: str,
-        key_deserializer: Callable[[Optional[bytes]], Any] = default_deserializer,
-        value_deserializer: Callable[[Optional[bytes]], Any] = default_deserializer,
+        key_deserializer: Callable[
+            [Optional[bytes]], Any
+        ] = default_deserializer,
+        value_deserializer: Callable[
+            [Optional[bytes]], Any
+        ] = default_deserializer,
     ):
         conf.setdefault("enable.auto.commit", False)
         conf.setdefault("auto.offset.reset", "earliest")
@@ -55,7 +59,9 @@ class KafkaReader:
         timeout: float = 1.0,
     ) -> int:
         if not self._consumer:
-            raise RuntimeError("Consumer not initialized. Use 'with KafkaReader(...)'.")
+            raise RuntimeError(
+                "Consumer not initialized. Use 'with KafkaReader(...)'."
+            )
 
         msgs: List[Message] = self._consumer.consume(
             num_messages=batch_size, timeout=timeout
@@ -74,7 +80,9 @@ class KafkaReader:
                 if msg.error().fatal():
                     log.error(f"KafkaReader: Fatal Kafka error", exc_info=True)
                     raise KafkaException(msg.error())
-                log.warning(f"KafkaReader: Non-fatal Kafka issue: {msg.error()}")
+                log.warning(
+                    f"KafkaReader: Non-fatal Kafka issue: {msg.error()}"
+                )
                 continue
 
             try:
@@ -84,7 +92,9 @@ class KafkaReader:
                     KafkaMessageData(key, value, msg.partition(), msg.offset())
                 )
             except Exception as e:
-                log.error(f"KafkaReader: Failed to deserialize message", exc_info=True)
+                log.error(
+                    f"KafkaReader: Failed to deserialize message", exc_info=True
+                )
                 continue
 
         if not batch:
@@ -110,7 +120,9 @@ class KafkaWriter:
     def __init__(
         self,
         conf: dict,
-        key_serializer: Callable[[Optional[Any]], Optional[bytes]] = default_serializer,
+        key_serializer: Callable[
+            [Optional[Any]], Optional[bytes]
+        ] = default_serializer,
         value_serializer: Callable[
             [Optional[Any]], Optional[bytes]
         ] = default_serializer,
@@ -135,16 +147,22 @@ class KafkaWriter:
                 )
             log.info(f"KafkaWriter: Producer closed.")
 
-    def publish(self, topic: str, value: Any, key: Optional[Any] = None) -> None:
+    def publish(
+        self, topic: str, value: Any, key: Optional[Any] = None
+    ) -> None:
         if not self._producer:
-            raise RuntimeError("Producer not initialized. Use 'with KafkaWriter(...)'.")
+            raise RuntimeError(
+                "Producer not initialized. Use 'with KafkaWriter(...)'."
+            )
 
         serialized_key = self._key_serializer(key)
         serialized_value = self._value_serializer(value)
 
         def delivery_report(err, msg):
             if err is not None:
-                log.error(f"KafkaWriter: Message failed to deliver", exc_info=True)
+                log.error(
+                    f"KafkaWriter: Message failed to deliver", exc_info=True
+                )
             else:
                 # Use print for debug output, typically
                 # print(f"KafkaWriter: Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")

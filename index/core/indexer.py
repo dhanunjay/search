@@ -8,7 +8,7 @@ from langchain_elasticsearch import DenseVectorStrategy, ElasticsearchStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from core.model import IndexDocumentJob
+from core.model import DocumentSource, IndexDocumentJob
 from wal.kafka import KafkaMessageData, KafkaReader
 
 log = logging.getLogger(__name__)
@@ -69,24 +69,16 @@ class IndexingWorker:
             IndexDocumentResponse: Response containing job ID, status, and metadata.
         """
 
-        file_path = req.source_properties["local_file_path"]
-        if not os.path.exists(file_path):
-            # BUG: File might have been deleted after we accepted the request
+        doc_source = DocumentSource(uri=req.source_url)
+        if not doc_source.is_validate_local_source():
+            # File might have been deleted after we accepted the request or it might have been deleted and a folder with similar name was created
             log.error(
                 "File is deleted or inaccessible. Drop the request and mark job failed"
             )
             return
-            # raise FileNotFoundError(file_path)
-        if not os.path.isfile(file_path):
-            # File was deleted and a folder with similar name was created
-            log.error(
-                "File was deleted and a folder with similar name was created. Drop the request and mark job failed"
-            )
 
-            return
-            # raise IsADirectoryError(file_path)
-
-        loader = PyPDFLoader(str(file_path), extract_images=False, mode="single")
+        file_path = doc_source.get_local_path()
+        loader = PyPDFLoader(file_path, extract_images=False, mode="single")
         docs = loader.load()
 
         text_splitter = RecursiveCharacterTextSplitter(
@@ -147,7 +139,9 @@ class IndexingAgent:
                 except Exception as e:
                     # Log critical error in the consumer loop itself
                     log.error(f"IndexingAgent:", exc_info=True)
-                    time.sleep(self.IDLE_SLEEP * 5)  # Sleep longer after an error
+                    time.sleep(
+                        self.IDLE_SLEEP * 5
+                    )  # Sleep longer after an error
 
             log.info(f"IndexingAgent: agent shutdown")
 
