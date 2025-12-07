@@ -7,6 +7,8 @@ langchain-community
 langchain-google-genai
 langchain-elasticsearch
 confluent-kafka
+sqlalchemy 
+psycopg2-binary
 
 # Server/API dependencies
 fastapi[standard]

@@ -1,7 +1,6 @@
 import logging
-import os
 import time
-from typing import Any, List
+from typing import List
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_elasticsearch import DenseVectorStrategy, ElasticsearchStore
@@ -9,6 +8,8 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from core.model import DocumentSource, IndexDocumentJob
+from db.data_models import IndexStatusType
+from db.db_manager import DBManager
 from wal.kafka import KafkaMessageData, KafkaReader
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ class IndexingWorker:
 
     def __init__(
         self,
+        db_manager: DBManager,
         es_url: str = "http://localhost:9200",
         index_name: str = "hybrid-search",
         api_key: str = "YOUR_API_KEY",
@@ -39,6 +41,7 @@ class IndexingWorker:
             index_name (str): Name of the index where documents will be stored.
             api_key (str): API key for Google Generative AI embeddings.
         """
+        self._db_manager = db_manager
         self.es_url = es_url
         self.index_name = index_name
         self.embeddings = GoogleGenerativeAIEmbeddings(
@@ -97,6 +100,10 @@ class IndexingWorker:
             f"Indexed document: file={file_path} chunks={len(chunks)} correlation_id={req.job_id}"
         )
 
+        self._db_manager.update_index_status(
+            correlation_id=req.job_id, new_status=IndexStatusType.COMPLETED
+        )
+
 
 class IndexingAgent:
 
@@ -107,7 +114,7 @@ class IndexingAgent:
         self.CONSUME_TIMEOUT = 1.0
         self.IDLE_SLEEP = 1
 
-    def __call__(self, batch: List[KafkaMessageData]) -> None:
+    def _process_job_batch(self, batch: List[KafkaMessageData]) -> None:
 
         log.debug(f"IndexingAgent: Processing batch of {len(batch)} jobs")
 
@@ -122,14 +129,15 @@ class IndexingAgent:
                 log.error(f"IndexingAgent: ", exc_info=True)
                 raise
 
-    def start(self) -> None:
+    def run(self) -> None:
         with self._kafka_reader as reader:
             log.info("IndexingAgent: agent started listening for messages")
             while self._running:
                 try:
                     # PASS THE TIMEOUT: This is CRITICAL for shutdown
                     processed_count = reader.consume_one_batch(
-                        callback=self.__call__, timeout=self.CONSUME_TIMEOUT
+                        callback=self._process_job_batch,
+                        timeout=self.CONSUME_TIMEOUT,
                     )
 
                     if processed_count == 0 and self._running:
