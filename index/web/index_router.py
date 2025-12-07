@@ -3,8 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from core.indexer import IndexingWorker
-from core.ingestion import IngestionService
+from core.ingestion import IngestionService, RemoteFileNotSupportedError
 from core.model import IndexDocumentRequest, IndexDocumentResponse
 
 router = APIRouter(
@@ -43,7 +42,12 @@ async def index_document(
             status_code=404,
             detail=f"File path can't be directory: {e.filename or str(e)}",
         )
+    except RemoteFileNotSupportedError as e:
+        raise HTTPException(status_code=501, detail=f"{str(e)}")
     except Exception as e:
         # Catch-all for unexpected errors → HTTP 500
         log.error(f"Index_document: ", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"We encountered an unexpected error... Please try again shortly.",
+        )

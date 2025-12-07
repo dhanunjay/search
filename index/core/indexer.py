@@ -69,7 +69,7 @@ class IndexingWorker:
             IndexDocumentResponse: Response containing job ID, status, and metadata.
         """
 
-        file_path = req.source_properties["file_path"]
+        file_path = req.source_properties["local_file_path"]
         if not os.path.exists(file_path):
             # BUG: File might have been deleted after we accepted the request
             log.error(

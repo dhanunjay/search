@@ -1,9 +1,10 @@
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import Field, asdict, dataclass
 from typing import Any, Dict, Literal, Optional, Union
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 log = logging.getLogger(__name__)
 
@@ -13,31 +14,38 @@ class IndexDocumentRequest(BaseModel):
     Request model for indexing a document into Elasticsearch.
 
     Attributes:
-        source_type (Literal["local_file"]): The type of source. Currently only 'local_file' is supported.
-        content_type (Literal["application/pdf"]): MIME type of the content. Currently only 'application/pdf' is supported.
-        source_properties (Dict[str, Any]): Properties specific to the source type.
-            - For local_file: {"file_path": "/path/to/file.pdf"}
+        source_url (str): The URL of the document to index.
+        content_type (Literal["application/pdf"]): MIME type of the content.
+        source_properties (Dict[str, Any]): Any additional properties.
     """
 
-    source_type: Literal["local_file"]
-
+    source_url: str
     content_type: Literal["application/pdf"]
-
-    source_properties: Dict[str, Any]
-
+    source_properties: Optional[Dict[str, Any]] = {}
     model_config = {"frozen": True}
 
-    @model_validator(mode="after")
-    def validate_source_properties(self) -> "IndexDocumentRequest":
-        if self.source_type == "local_file":
-            if "file_path" not in self.source_properties:
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, v: str) -> str:
+        """Checks if the source_url is a structurally valid URI."""
+        try:
+            result = urlparse(v)
+
+            # Require both a scheme (http, file, s3) and a network location (netloc)
+            # OR just a scheme and path if it's a file:// URL.
+            is_valid_web_url = all([result.scheme, result.netloc])
+            is_valid_file_url = result.scheme == "file" and result.path
+
+            if not is_valid_web_url and not is_valid_file_url:
                 raise ValueError(
-                    "source_properties must include 'file_path' for local_file"
+                    "source_url must be a valid URI with a scheme (file://)."
                 )
 
-            if not self.source_properties.get("file_path"):
-                raise ValueError("file_path cannot be empty for local_file")
-        return self
+        except ValueError as e:
+            # Re-raise the error for Pydantic to catch
+            raise ValueError(f"Invalid URL structure: {e}")
+
+        return v
 
 
 class IndexDocumentResponse(BaseModel):
@@ -61,7 +69,7 @@ class IndexDocumentResponse(BaseModel):
 @dataclass
 class IndexDocumentJob:
     job_id: str
-    source_type: str
+    source_url: str
     content_type: str
     source_properties: Dict[str, Any]
 

@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,7 +10,7 @@ from core.model import custom_deserializer, custom_serializer
 from util import logger as log
 from wal.kafka import KafkaReader, KafkaWriter
 
-GOOGLE_API_KEY = "AIzaSyACiooyyR56PJ_Oztt3EDDQTjFQUuZgZjo"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "YOUR_GOOGLE_API_KEY")
 
 INDEX_JOBS_TOPIC = "index_jobs_topic"
 KAFKA_CONSUMER_CONF = {

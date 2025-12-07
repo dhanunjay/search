@@ -25,5 +25,3 @@ def setup_logging():
 
     # Optional: Suppress noisy third-party library logs (e.g., Kafka, urllib3)
     logging.getLogger("kafka").setLevel(logging.WARNING)
-
-    print("Logging configured successfully.")
