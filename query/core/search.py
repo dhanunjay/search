@@ -1,10 +1,12 @@
+from dataclasses import dataclass
 from typing import List
-from pydantic import BaseModel
+
 from langchain_elasticsearch import DenseVectorStrategy, ElasticsearchStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 
-class SearchDocumentRequest(BaseModel):
+@dataclass
+class SearchDocumentRequest:
     """
     Request model for performing a search query.
 
@@ -19,7 +21,9 @@ class SearchDocumentRequest(BaseModel):
     class Config:
         frozen = True
 
-class SearchResult(BaseModel):
+
+@dataclass
+class SearchResult:
     """
     Represents a search result
 
@@ -28,12 +32,14 @@ class SearchResult(BaseModel):
         link (str): The link to the document source.
         snippet (str): The snippet for showing the context.
     """
+
     title: str
     link: str
     snippet: str
 
 
-class SearchDocumentResponse(BaseModel):
+@dataclass
+class SearchDocumentResponse:
     """
     Response model for search operations.
 
@@ -86,8 +92,9 @@ class SearchService:
             strategy=DenseVectorStrategy(hybrid=True),
         )
 
-    
-    def search_documents(self, req: SearchDocumentRequest) -> SearchDocumentResponse:
+    def search_documents(
+        self, req: SearchDocumentRequest
+    ) -> SearchDocumentResponse:
         """
         Executes a hybrid search against the indexed documents.
 
@@ -100,7 +107,7 @@ class SearchService:
         retriever = self.db.as_retriever(search_kwargs={"k": req.limit})
         docs = retriever.invoke(req.query)
 
-        # Deduplicate based on correlation_id
+        # BUG: How do we filter chunks from the same doc? client side dedupe may not honour the limit if chunks from the same doc match the criteria the filtering should be done with the query DSL
         docs = self._deduplicate_docs(docs)
 
         result = []
@@ -112,7 +119,6 @@ class SearchService:
 
         return SearchDocumentResponse(result=result)
 
-    
     def _deduplicate_docs(self, docs: List) -> List:
         """
         Private helper to eliminate duplicate documents based on correlation_id in metadata.
@@ -130,5 +136,5 @@ class SearchService:
         if correlation_id not in seen:
             seen.add(correlation_id)
             unique_docs.append(doc)
-            
+
         return unique_docs
