@@ -8,3 +8,57 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js Build Output
+/.next/
+/out/
+# Next.js specific cache files
+.next/
+*.js.map
+*.ts.map
+
+# Next.js dev server cache
+.next/
+.next/cache/
+
+# Production Build Files
+# If you are deploying the 'out' directory
+# /out
+
+# Environments
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# npm & yarn logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# TypeScript/JavaScript build artifacts (if not handled by Next.js directly)
+/dist
+/build
+
+# Vercel/Netlify specific files
+.vercel
+.netlify
+
+# Optional: Configuration files that might contain secrets or local paths
+# You might need to adjust these based on your specific setup
+# next.config.js (if it includes sensitive information)
+# .babelrc.json (if it includes local config)
