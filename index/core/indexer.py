@@ -94,6 +94,7 @@ class IndexingWorker:
             if not hasattr(chunk, "metadata"):
                 chunk.metadata = {}
             chunk.metadata["correlation_id"] = req.job_id
+            chunk.metadata["source_uri"] = req.source_url
 
         self.db.add_documents(chunks)
         log.info(

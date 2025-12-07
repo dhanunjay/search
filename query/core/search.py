@@ -89,7 +89,7 @@ class SearchService:
             es_url=self.es_url,
             index_name=self.index_name,
             embedding=self.embeddings,
-            strategy=DenseVectorStrategy(hybrid=True),
+            #            strategy=DenseVectorStrategy(hybrid=True),
         )
 
     def search_documents(
@@ -113,7 +113,7 @@ class SearchService:
         result = []
         for doc in docs:
             title = doc.metadata.get("title", "Untitled")
-            link = doc.metadata.get("source", "")
+            link = doc.metadata.get("source_uri", "")
             snippet = doc.page_content[:200] + "..."
             result.append(SearchResult(title=title, link=link, snippet=snippet))
 

@@ -155,9 +155,6 @@ class MetadataAgent:
 
                     if messages_read == 0 and self._running:
                         # If no messages were read, wait before polling again
-                        log.info(
-                            f"No messages read. Polling again in {self._poll_interval}s."
-                        )
                         time.sleep(self._poll_interval)
 
                 except KafkaException as ke:
