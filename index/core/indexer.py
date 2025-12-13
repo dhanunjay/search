@@ -2,6 +2,7 @@ import logging
 import time
 from typing import List
 
+from confluent_kafka import KafkaException
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_elasticsearch import DenseVectorStrategy, ElasticsearchStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -45,8 +46,9 @@ class IndexingWorker:
         self.es_url = es_url
         self.index_name = index_name
         self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
+            model="text-embedding-004",
             google_api_key=api_key,
+            task_type="RETRIEVAL_DOCUMENT",
         )
         self.db = ElasticsearchStore(
             es_url=self.es_url,
@@ -96,6 +98,7 @@ class IndexingWorker:
             chunk.metadata["correlation_id"] = req.job_id
             chunk.metadata["source_uri"] = req.source_url
 
+        # TODO: Make these operations idempotent so that retrying works as expected
         self.db.add_documents(chunks)
         log.info(
             f"Indexed document: file={file_path} chunks={len(chunks)} correlation_id={req.job_id}"
@@ -145,6 +148,12 @@ class IndexingAgent:
                         # Sleep only if no messages were found AND we haven't been asked to stop
                         time.sleep(self.IDLE_SLEEP)
 
+                except KafkaException as ke:
+                    log.fatal(
+                        f"FATAL Kafka error. Shutting down agent.",
+                        exc_info=True,
+                    )
+                    break
                 except Exception as e:
                     # Log critical error in the consumer loop itself
                     log.error(f"IndexingAgent:", exc_info=True)

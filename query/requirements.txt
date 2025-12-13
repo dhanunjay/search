@@ -11,3 +11,4 @@ fastapi[standard]
 
 # other
 pypdf
+ranx

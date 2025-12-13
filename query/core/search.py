@@ -4,6 +4,8 @@ from typing import List
 from langchain_elasticsearch import DenseVectorStrategy, ElasticsearchStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
+from core.retrieval import HybridSearcher
+
 
 @dataclass
 class SearchDocumentRequest:
@@ -69,7 +71,7 @@ class SearchService:
         self,
         es_url: str = "http://localhost:9200",
         index_name: str = "hybrid-search",
-        api_key: str = "YOUR_API_KEY",
+        api_key: str = None,
     ):
         """
         Initializes the SearchService with Elasticsearch connection and embedding model.
@@ -79,17 +81,14 @@ class SearchService:
             index_name (str): Name of the index to query.
             api_key (str): API key for Google Generative AI embeddings.
         """
-        self.es_url = es_url
-        self.index_name = index_name
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
-            google_api_key=api_key,
+
+        self._hybridSearcher = HybridSearcher(
+            index_name=index_name, es_url=es_url
         )
-        self.db = ElasticsearchStore(
-            es_url=self.es_url,
-            index_name=self.index_name,
-            embedding=self.embeddings,
-            #            strategy=DenseVectorStrategy(hybrid=True),
+        self._embeddings = GoogleGenerativeAIEmbeddings(
+            model="text-embedding-004",
+            google_api_key=api_key,
+            task_type="RETRIEVAL_QUERY",
         )
 
     def search_documents(
@@ -104,37 +103,22 @@ class SearchService:
         Returns:
             SearchDocumentResponse: A response containing the list of matching document contents.
         """
-        retriever = self.db.as_retriever(search_kwargs={"k": req.limit})
-        docs = retriever.invoke(req.query)
-
-        # BUG: How do we filter chunks from the same doc? client side dedupe may not honour the limit if chunks from the same doc match the criteria the filtering should be done with the query DSL
-        docs = self._deduplicate_docs(docs)
+        query_vector = self._embeddings.embed_query(text=req.query, output_dimensionality=768, task_type="RETRIEVAL_QUERY")
+        hits = self._hybridSearcher.hybrid_search_rrf(
+            query=req.query,
+            query_vector=query_vector,
+            k=req.limit,
+            num_candidates=req.limit,
+        )
 
         result = []
-        for doc in docs:
-            title = doc.metadata.get("title", "Untitled")
-            link = doc.metadata.get("source_uri", "")
-            snippet = doc.page_content[:200] + "..."
+        for hit in hits:
+            metadata = hit.get("_source", {}).get("metadata", {})
+            full_content = hit.get("_source", {}).get("text", "")
+            link = metadata.get("source_uri", "")
+            title = metadata.get("title", link)
+            snippet = full_content[:200].replace("\n", " ") + "..."
             result.append(SearchResult(title=title, link=link, snippet=snippet))
 
         return SearchDocumentResponse(result=result)
 
-    def _deduplicate_docs(self, docs: List) -> List:
-        """
-        Private helper to eliminate duplicate documents based on correlation_id in metadata.
-
-        Args:
-            docs (List): List of document objects returned by retriever.
-
-        Returns:
-            List: Deduplicated list of documents.
-        """
-        seen = set()
-        unique_docs = []
-        for doc in docs:
-            correlation_id = doc.metadata.get("correlation_id")
-        if correlation_id not in seen:
-            seen.add(correlation_id)
-            unique_docs.append(doc)
-
-        return unique_docs

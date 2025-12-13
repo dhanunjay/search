@@ -61,15 +61,19 @@ class MetadataWorker:
                 source_uri=job.source_url,
                 content_hash=content_hash,
             )
+            # Dual Write Issue: Use local transactions (persist document and an event: document_index_requested)
+            # the events table needs to be CDC to kafka topic
+            # This is a temporary solution
+            self._kafka_writer.publish(
+                topic=self._topic, key=job.job_id, value=job
+            )
+
         except IntegrityError as e:
             log.error(
                 f"Integrity Violation for content_hash={content_hash} correlation_id={job.job_id}). Error: {e.orig}",
                 exc_info=True,
             )
             self._mark_job_failed(job=job, content_hash=content_hash)
-            return
-
-        self._kafka_writer.publish(topic=self._topic, key=job.job_id, value=job)
 
     def _mark_job_failed(
         self, job: IndexDocumentJob, content_hash: str
@@ -140,7 +144,7 @@ class MetadataAgent:
         """
         Main run loop for the agent, calling Kafka consume in batches.
         """
-        log.info("MetadataAgent: started listening for messages.")
+        log.info("MetadataAgent: started listening for messages")
 
         # Use the KafkaReader's context manager for safe consumer initialization/closing
         with self._kafka_reader as reader:
@@ -164,9 +168,10 @@ class MetadataAgent:
                     )
                     break
                 except Exception as e:
-                    # Catch any unexpected error not related to callback failure (which is re-raised)
                     log.error(f"Unexpected error in run loop.", exc_info=True)
                     time.sleep(self._poll_interval)
+
+        log.info("MetadataAgent: agent shutdown")
 
     def stop(self) -> None:
         self._running = False

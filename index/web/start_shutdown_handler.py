@@ -18,7 +18,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "YOUR_GOOGLE_API_KEY")
 INDEX_JOBS_TOPIC = "index_jobs_topic"
 IDX_KAFKA_CONSUMER_CONF = {
     "bootstrap.servers": "localhost:9092",
-    "group.id": "index_jobs_topic",
+    "group.id": "index_jobs_group",
 }
 
 # Kafka producer
@@ -30,7 +30,7 @@ KAFKA_PRODUCER_CONF = {
 META_JOBS_TOPIC = "db_jobs_topic"
 META_KAFKA_CONSUMER_CONF = {
     "bootstrap.servers": "localhost:9092",
-    "group.id": "db_jobs_topic",
+    "group.id": "db_jobs_group",
 }
 META_DATABASE_URL = (
     "postgresql+psycopg2://test:testpwd123@localhost:5432/hybridsearch"
